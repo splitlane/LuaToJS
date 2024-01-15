@@ -1,0 +1,146 @@
+{
+  "type": "Chunk",       
+  "body": [
+    {
+      "type": "LocalStatement",
+      "variables": [     
+        {
+          "type": "Identifier",
+          "name": "a",   
+          "range": [     
+            7,
+            8
+          ],
+          "isLocal": true
+        }
+      ],
+      "init": [
+        {
+          "type": "NumericLiteral",
+          "value": 1,    
+          "raw": "1",    
+          "range": [     
+            11,
+            12
+          ]
+        }
+      ],
+      "range": [
+        1,
+        12
+      ]
+    },
+    {
+      "type": "LocalStatement",
+      "variables": [     
+        {
+          "type": "Identifier",
+          "name": "a",   
+          "range": [     
+            19,
+            20
+          ],
+          "isLocal": true
+        }
+      ],
+      "init": [
+        {
+          "type": "NumericLiteral",
+          "value": 1,    
+          "raw": "1",    
+          "range": [     
+            23,
+            24
+          ]
+        }
+      ],
+      "range": [
+        13,
+        24
+      ]
+    },
+    {
+      "type": "DoStatement",
+      "body": [
+        {
+          "type": "AssignmentStatement",
+          "variables": [ 
+            {
+              "type": "Identifier",
+              "name": "b",
+              "range": [ 
+                28,      
+                29       
+              ],
+              "isLocal": false
+            }
+          ],
+          "init": [      
+            {
+              "type": "NumericLiteral",
+              "value": 1,
+              "raw": "1",
+              "range": [ 
+                32,      
+                33       
+              ]
+            }
+          ],
+          "range": [     
+            28,
+            33
+          ]
+        },
+        {
+          "type": "LocalStatement",
+          "variables": [ 
+            {
+              "type": "Identifier",
+              "name": "c",
+              "range": [ 
+                40,      
+                41       
+              ],
+              "isLocal": true
+            }
+          ],
+          "init": [      
+            {
+              "type": "NumericLiteral",
+              "value": 2,
+              "raw": "2",
+              "range": [ 
+                44,      
+                45       
+              ]
+            }
+          ],
+          "range": [     
+            34,
+            45
+          ]
+        }
+      ],
+      "range": [
+        25,
+        49
+      ]
+    }
+  ],
+  "range": [
+    1,
+    49
+  ],
+  "comments": [],        
+  "globals": [
+    {
+      "type": "Identifier",
+      "name": "b",       
+      "range": [
+        28,
+        29
+      ],
+      "isLocal": false   
+    }
+  ]
+}
