@@ -4,11 +4,9 @@ Converts lua to js
 TODO:
 Standard library, Internal library (Get from old project)
 
-Global variables, probably set at start of code?
-
-Scope differences, let
-
 Comments, whitespace after lastnode
+
+Update table length as items are added
 */
 
 
@@ -16,407 +14,11 @@ var parser = require('luaparse');
 
 
 
-
-
-var CODE = `
---test
-print('hello world!')
-
-a = 1
-
-return 3
-`
-
-CODE = `
-do end
--- hi
-if a then end
-`
-
-
-
-
-
-
-
-
-
-CODE = `
-package.path = package.path .. ';../?.lua'
-require('path')
-
-
---generate symbols
---[[
-local listnasdaq = require('list_nasdaq')
-local symbols = {}
-local t = listnasdaq()
-local list = t.data.rows
-for i = 1, #list do
-    local d = list[i]
-    symbols[#symbols + 1] = d.symbol:gsub('%s', '')
-end
-local out = '{\'' .. table.concat(symbols, '\',\'') .. '\'}'
-io.open('out.txt', 'wb+'):write(out)
---]]
-
-
-local json = require('json')
-
-
-
-
-
-
---[[
-    1704067140: last minute of 2023
-    go back in increments of 604800
-
-    s = e - 604800
-
-
-    40200
-
-    some data is missing
-
-    e isn't included, so just set e = s and s = e - 604800
-]]
-
-
-
-
-
-
-
-
-
-local socket = require('socket')
-local FR = require('fastread')
-local tickeryfinance = require('ticker_yfinance') --No cache, assumes web scraping new data
-
---[[
--- local s, e = 1704283800, 1704067140
-local e = 1704067140
-local s = e - 604800
-local data = tickeryfinance('AAPL', s, e)
-local t = data.chart.result[1]
-local ts = t.timestamp
-print(ts[1], ts[#ts])
-print(e - ts[#ts])
--- print(1704067140 - ts[#ts])
-
--- for i = 1, #ts - 1 do
---     local d = ts[i + 1] - ts[i]
---     if d ~= 60 then
---         print(i, i + 1)
---         print(ts[i], ts[i + 1])
---         print(d)
---     end
--- end
---]]
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-local ffi = require('ffi')
-local C = ffi.C
-function FR.GetLastElementStart(filename, notrailingcomma)
-    local size = FR.GetFileSize(filename)
-    -- print(size)
-
-    --find last '}' and backtrack
-    local buffersize = 100
-    local memory = ffi.cast('unsigned char*', C.malloc(size))
-
-    local f = C.fopen(filename, 'rb')
-
-    local i = -1
-    local level = 0
-    local instring = false
-    local instringcheck = nil
-    local laste = nil
-    local lasts = nil
-    local out = 0
-    if notrailingcomma then
-        out = 1
-    end
-    while true do
-        local position = buffersize * i
-        if position < -size then
-            position = -size
-            buffersize = buffersize * (i + 1) + size
-        end
-
-        C.fseek(f, position, 2)
-        C.fread(memory, buffersize, 1, f)
-
-        for i2 = buffersize - 1, 0, -1 do
-            -- print(memory[i2], string.char(memory[i2]), instring)
-            -- print(lasts, laste)
-            local a = memory[i2]
-
-
-            if instringcheck then
-                if a == 92 then
-                    instringcheck = instringcheck + 1
-                else
-                    if instringcheck % 2 == 0 then
-                        lasts = position + i2 + 2
-                        instring = false
-                    end
-                    instringcheck = nil
-                end
-            end
-
-            if instring then
-                if a == 39 then
-                    instringcheck = 0
-                end
-            else
-                if a == 39 then
-                    instring = true
-                    laste = position + i2
-                elseif a == 125 then
-                    level = level + 1
-                elseif a == 123 then
-                    level = level - 1
-                    if level == 0 then
-                        -- print(position, i2, size)
-                        C.fclose(f)
-                        C.free(memory)
-                        -- return out
-                        return size + position + i2 + 1
-                    end
-                elseif a == 39 then
-                    instring = true
-                elseif a == 44 then
-                    if level == 0 then
-                        out = out + 1
-                    end
-                end
-            end
-        end
-
-        -- print(ffi.string(memory, buffersize), buffersize) -- for visualization only
-
-        if position == -size then
-            break
-        end
-        i = i - 1
-
-    end
-end
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
--- print(#symbols, error)
-
-
-
-
-
-
-
-
-
-local DATA = {}
-
-DBFILENAME = 'db.lua'
-
-DEBUG = {
-    
-}
-
-DEBUG_LASTT = nil
-
-
--- print(FR.GetLastElementStart(DBFILENAME))
--- error()
-
--- local start = FR.GetNextIndex(DBFILENAME)
--- local memory, size = FR.Read(DBFILENAME)
--- DATA = FR.Deserialize(memory, size)
--- local start = #DATA + 1
-local start = FR.GetNextIndex(DBFILENAME) or 1
--- print(start)error()
-
-local function SAVE()
-    print('SAVING')
-    print('TOTAL BYTES USED: ')
-
-    local f = io.open(DBFILENAME, 'ab+')
-    f:write(FR.ConstructData(DATA, true, DEBUG))
-    f:close()
-
-    DATA = {}
-    start = #DATA + 1
-
-    print('SAVING DONE')
-end
-
-
-
-local IM = require('indexmap')
-local outmt = {
-    timestamp = 2,
-    volume = 3,
-    close = 4,
-    high = 5,
-    low = 6,
-    open = 7,
-}
-
-local lastdone = true
-print(pcall(function()
-
-for i = start, #symbols do
-    local symbol = symbols[i]
-
-    print(i .. '/' .. #symbols, symbol)
-
-    local s, e = 1704067140
-    local out = nil
-    if out then
-        IM.Map(out, outmt)
-        local ts = out.timestamp
-        for i = 1, #ts do
-            local a = ts[i]
-            if not e or tonumber(a) < e then
-                e = tonumber(a)
-            end
-        end
-    else
-        out = {
-            -- timestamp = {},
-            -- volume = {},
-            -- close = {},
-            -- high = {},
-            -- low = {},
-            -- open = {},
-            i, {}, {}, {}, {}, {}, {}, 
-        }
-        IM.Map(out, outmt)
-    end
-    
-
-    DATA[#DATA + 1] = out
-    while true do
-        lastdone = false
-        e = s
-        s = e - 604800
-
-        print(s .. ' -> ' .. e)
-
-        local data, httperrcode = tickeryfinance(symbol, s, e)
-        DEBUG_LASTT = data
-        if data then
-            local t = data.chart.result[1]
-            local pricedata = t.indicators.quote[1]
-
-            local t2 = out.timestamp
-            local v = t.timestamp
-            if not v then
-                break
-            end
-            for i = 1, #v do
-                t2[#t2 + 1] = v[i]
-            end
-            for k, v in pairs(pricedata) do
-                local t2 = out[k]
-                for i = 1, #v do
-                    t2[#t2 + 1] = v[i]
-                end
-            end
-        else
-            if httperrcode == 422 then
-                lastdone = true
-                break
-            elseif httperrcode == 404 then
-                DATA[#DATA] = '404'
-                break
-            else
-                error('Invalid error: ' .. httperrcode)
-            end
-        end
-
-        socket.sleep(1)
-    end
-
-    -- IM.Remove(out)
-
-    print('if ur gonna interrupt, do so now')
-    socket.sleep(1)
-
-    if i % 1000 == 0 then
-        SAVE()
-    end
-end
-
-
-end))
-
-if lastdone == false then
-    DATA[#DATA] = nil
-end
-
-SAVE()
-
-print('PRESS ENTER TO EXIT, type something then press enter to display last')
-local a = io.read()
-if a ~= '' then
-    print(json.encode(DEBUG_LASTT))
-end
-`
+// https://www.geeksforgeeks.org/node-js-fs-readfilesync-method/
+const fs = require('fs');
+var infile = './in.lua';
+var outfile = './out.js';
+var CODE = fs.readFileSync(infile, {encoding: 'utf8', flag: 'r'});
 
 
 
@@ -451,17 +53,41 @@ r(ast);
 // 3. AST to JS
 var out = '';
 
+
 // 3.1. Declare all globals at the top
+let definedGlobals = []; // Exclude already defined globals
+function listGlobals() {
+    return Object.getOwnPropertyNames(this);
+}
+let g = listGlobals()
+for (let i = 0; i < g.length; i++) {
+    definedGlobals.push(g[i]);
+}
+let definedGlobalsMap = {};
+for (let i = 0; i < definedGlobals.length; i++) {
+    definedGlobalsMap[definedGlobals[i]] = true;
+}
+
 if (ast.globals.length != 0) {
-    out += 'var ';
+    let empty = true;
+    // out += 'var ';
     for (let i = 0; i < ast.globals.length; i++) {
         let c = ast.globals[i];
-        out += c.name;
-        if (i != ast.globals.length - 1) {
-            out += ','
+        if (!definedGlobalsMap[c.name]) {
+            if (empty) {
+                out += 'var ';
+                empty = false;
+            }
+            // out += c.name + '=' + c.name + '?' + c.name + ':undefined';
+            out += c.name;
+            if (i != ast.globals.length - 1) {
+                out += ',';
+            }
         }
     }
-    out += ';'
+    if (!empty) {
+        out += ';'
+    }
 }
 
 
@@ -814,6 +440,9 @@ function recurse(node, isList) {
                         out += ',';
                     }
                 }
+                // TODO: More permenant solution
+                out += ',length:' + (i2 - 1);
+
                 out += '}';
                 break;
             case 'LogicalExpression':
@@ -1000,4 +629,7 @@ for (let i = 0; i < comments.length; i++) {
 
 
 
-console.log(out);
+// console.log(out);
+
+
+fs.writeFileSync(outfile, out, {encoding: 'utf8', flag: 'w'});

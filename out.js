@@ -1,0 +1,1 @@
+let t={1:'a',2:'b',3:'c',length:3};for(let i=1;i<=t.length;i++){console.log(t[i]);}
