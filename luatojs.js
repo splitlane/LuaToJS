@@ -2,7 +2,7 @@
 Converts lua to js
 
 TODO:
-Standard library, Internal library (Get from old project)
+Standard library
 
 Comments, whitespace after lastnode
 
@@ -22,8 +22,8 @@ var parser = require('luaparse');
 const fs = require('fs');
 var infile = './in.lua';
 var outfile = './out.js';
-// var runtimefile = './runtime.js'
-var runtimefile = './runtime_min.js'
+var runtimefile = './runtime.js'
+// var runtimefile = './runtime_min.js'
 var CODE = fs.readFileSync(infile, {encoding: 'utf8', flag: 'r'});
 
 
@@ -167,16 +167,16 @@ function recurse(node, isList) {
                 recurse(node.clauses, true);
                 break;
             case 'IfClause':
-                out += 'if(';
+                out += 'if(RuntimeInternal.isTrue(';
                 recurse(node.condition);
-                out += '){';
+                out += ')){';
                 recurse(node.body, true);
                 out += '}';
                 break;
             case 'ElseifClause':
-                out += 'else if(';
+                out += 'else if(RuntimeInternal.isTrue(';
                 recurse(node.condition);
-                out += '){';
+                out += ')){';
                 recurse(node.body, true);
                 out += '}';
                 break;
@@ -186,9 +186,9 @@ function recurse(node, isList) {
                 out += '}';
                 break;
             case 'WhileStatement':
-                out += 'while(';
+                out += 'while(RuntimeInternal.isTrue(';
                 recurse(node.condition);
-                out += '){';
+                out += ')){';
                 recurse(node.body, true);
                 out += '}';
                 break;
@@ -200,9 +200,9 @@ function recurse(node, isList) {
             case 'RepeatStatement':
                 out += 'do{';
                 recurse(node.body, true);
-                out += '}while('; 
+                out += '}while(RuntimeInternal.isTrue('; 
                 recurse(node.condition);
-                out += ');';
+                out += '));';
                 break;
             case 'LocalStatement':
                 let noLocalList = [];
@@ -211,6 +211,7 @@ function recurse(node, isList) {
                 for (let i = 0; i < node.variables.length; i++) {
                     // TODO: ADD MORE CALL STATEMENT TYPES
                     if (i < node.init.length && (node.init[i].type == 'CallExpression') && (i + 1 == node.init.length && node.variables.length > i + 1)) {
+                        // function call
                         let noLocalsUsed = true;
                         for (let i2 = i; i2 < node.variables.length; i2++) {
                             if (localsUsed[node.variables[i2].name] && i2 < node.init.length) {
@@ -263,7 +264,60 @@ function recurse(node, isList) {
                             out += ';'
                             break;
                         }
+                    } else if (i < node.init.length && (node.init[i].type == 'VarargLiteral') && (i + 1 == node.init.length && node.variables.length > i + 1)) {
+                        // vararg
+                        // RuntimeInternal_VARARG
+                        let noLocalsUsed = true;
+                        for (let i2 = i; i2 < node.variables.length; i2++) {
+                            if (localsUsed[node.variables[i2].name] && i2 < node.init.length) {
+                                noLocalsUsed = false;
+                                // noLocalList.push(node.variables[i2]);
+                            }
+                        }
+
+                        if (noLocalsUsed) {
+                            if (empty) {
+                                out += 'let';
+                                empty = false;
+                            }
+                            out += '[';
+                            for (let i2 = i; i2 < node.variables.length; i2++) {
+                                recurse(node.variables[i2]);
+                                if (i2 != node.variables.length - 1) {
+                                    out += ',';
+                                }
+                            }
+                            out += ']=RuntimeInternal_VARARG';
+                            break;
+                        } else {
+                            if (noLocalList.length > 0) {
+                                if (!empty) {
+                                    out += ';';
+                                    empty = false;
+                                }
+                                for (let i = 0; i < noLocalList.length; i++) {
+                                    recurse(noLocalList[i]);
+                                    if (i < node.init.length) {
+                                        out += '=';
+                                        recurse(node.init[i]);
+                                    }
+                                    out += ',';
+                                }
+                            }
+                            noLocalList = [];
+
+                            out += '[';
+                            for (let i2 = i; i2 < node.variables.length; i2++) {
+                                recurse(node.variables[i2]);
+                                if (i2 != node.variables.length - 1) {
+                                    out += ',';
+                                }
+                            }
+                            out += ']=RuntimeInternal_VARARG;';
+                            break;
+                        }
                     } else {
+                        // normal
                         if (localsUsed[node.variables[i].name] && i < node.init.length) {
                             noLocalList.push(node.variables[i]);
                         } else {
@@ -339,9 +393,9 @@ function recurse(node, isList) {
                 // recurse(node.parameters, true);
                 for (let i = 0; i < node.parameters.length; i++) {
                     let c = node.parameters[i];
-                    if (c.type == 'VarargLiteral') {
-                        out += '...';
-                    }
+                    // if (c.type == 'VarargLiteral') {
+                    //     out += '...';
+                    // }
                     recurse(c);
                     if (i != node.parameters.length - 1) {
                         out += ',';
@@ -392,7 +446,7 @@ function recurse(node, isList) {
                 }
                 out += ']=_f(_s,_v);_v=';
                 recurse(node.variables[0]);
-                out += ';if(_var==null||_var==undefined){break}';
+                out += ';if(_v==null||_v==undefined){break}';
                 recurse(node.body, true);
                 out += '}';
                 break;
@@ -431,8 +485,7 @@ function recurse(node, isList) {
                 out += 'null';
                 break;
             case 'VarargLiteral':
-                // TODO: Internal lib
-                out += '__VARARG';
+                out += '...RuntimeInternal_VARARG';
                 break;
             case 'TableKey':
                 out += '[';
