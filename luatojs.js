@@ -6,7 +6,11 @@ Standard library, Internal library (Get from old project)
 
 Comments, whitespace after lastnode
 
-Update table length as items are added
+Typedarrays for strings?
+
+Metatables: Proxy, Reflect or (compile?)
+
+GetFirstValue
 */
 
 
@@ -18,7 +22,12 @@ var parser = require('luaparse');
 const fs = require('fs');
 var infile = './in.lua';
 var outfile = './out.js';
+// var runtimefile = './runtime.js'
+var runtimefile = './runtime_min.js'
 var CODE = fs.readFileSync(infile, {encoding: 'utf8', flag: 'r'});
+
+
+
 
 
 
@@ -395,8 +404,22 @@ function recurse(node, isList) {
                 out += node.name;
                 break;
             case 'StringLiteral':
-                // out += '\'' + node.value + '\'';
-                out += node.raw;
+                let s = node.raw;
+                if (s[0] == '\'' || s[0] == '\"') {
+                    // Normal string
+                    out += s;
+                } else {
+                    // Long string
+                    let i = 1;
+                    while (true) {
+                        if (s[i] == '[') {
+                            break;
+                        }
+                        i++;
+                    }
+                    out += '`' + s.substring(i + 1, s.length - i - 1).replaceAll('`', '\\`').replaceAll('$', '\\$') + '`'
+                }
+
                 break;
             case 'NumericLiteral':
                 out += node.value;
@@ -440,8 +463,6 @@ function recurse(node, isList) {
                         out += ',';
                     }
                 }
-                // TODO: More permenant solution
-                out += ',length:' + (i2 - 1);
 
                 out += '}';
                 break;
@@ -458,6 +479,7 @@ function recurse(node, isList) {
                 recurse(node.right);
                 break;
             case 'BinaryExpression':
+                out += '(';
                 switch (node.operator) {
                     case '..':
                         recurse(node.left);
@@ -509,6 +531,12 @@ function recurse(node, isList) {
                         recurse(node.left);
                         out += '/';
                         recurse(node.right);
+                        out += ')';
+                        break;
+                    case '/':
+                        recurse(node.left);
+                        out += '/';
+                        recurse(node.right);
                         break;
                     case '*':
                         recurse(node.left);
@@ -538,12 +566,14 @@ function recurse(node, isList) {
                     default:
                         break;
                 }
+                out += ')';
                 break;
             case 'UnaryExpression':
                 switch (node.operator) {
                     case '#':
+                        out += 'RuntimeInternal.getLength('
                         recurse(node.argument);
-                        out += '.length'
+                        out += ')'
                         break;
                     case '-':
                         out += '-';
@@ -631,5 +661,6 @@ for (let i = 0; i < comments.length; i++) {
 
 // console.log(out);
 
-
+var runtime = fs.readFileSync(runtimefile, {encoding: 'utf8', flag: 'r'});
+out = runtime + out;
 fs.writeFileSync(outfile, out, {encoding: 'utf8', flag: 'w'});

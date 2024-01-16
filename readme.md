@@ -1,4 +1,5 @@
-# Lua To JS: A complete Lua to JS Transpiler
+# Lua To JS: A complete Lua to JS Transpiler written in JS
+LuaToJS uses the awesome [luaparse](https://github.com/fstirlitz/luaparse) library to parse Lua code into an Abstract Syntax Tree. Using this AST, LuaToJS navigates the nodes and generates JS code. The Lua standard libraries were written manually in JS.
 
 ## How to use:
 Put your Lua code in [in.lua](in.lua) then run [luatojs.js](luatojs.js). The JS code will be outputted in [out.js](out.js).
