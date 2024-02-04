@@ -11,6 +11,8 @@ Typedarrays for strings?
 Metatables: Proxy, Reflect or (compile?)
 
 GetFirstValue
+
+JS Interop (calling js functions and using js types from lua)
 */
 
 
@@ -220,20 +222,28 @@ function recurse(node, isList) {
                             }
                         }
 
+                        let ambiguous = node.variables.length - 1 == i;
                         if (noLocalsUsed) {
                             if (empty) {
                                 out += 'let';
                                 empty = false;
                             }
-                            out += '[';
-                            for (let i2 = i; i2 < node.variables.length; i2++) {
-                                recurse(node.variables[i2]);
-                                if (i2 != node.variables.length - 1) {
-                                    out += ',';
+                            if (ambiguous) {
+                                recurse(node.variables[i]);
+                                out += '=RuntimeInternal.wrapAmbiguousCall(';
+                                recurse(node.init[i]);
+                                out += ')';
+                            } else {
+                                out += '[';
+                                for (let i2 = i; i2 < node.variables.length; i2++) {
+                                    recurse(node.variables[i2]);
+                                    if (i2 != node.variables.length - 1) {
+                                        out += ',';
+                                    }
                                 }
+                                out += ']=';
+                                recurse(node.init[i]);
                             }
-                            out += ']=';
-                            recurse(node.init[i]);
                             break;
                         } else {
                             if (noLocalList.length > 0) {
@@ -252,15 +262,22 @@ function recurse(node, isList) {
                             }
                             noLocalList = [];
 
-                            out += '[';
-                            for (let i2 = i; i2 < node.variables.length; i2++) {
-                                recurse(node.variables[i2]);
-                                if (i2 != node.variables.length - 1) {
-                                    out += ',';
+                            if (ambiguous) {
+                                recurse(node.variables[i]);
+                                out += '=RuntimeInternal.wrapAmbiguousCall(';
+                                recurse(node.init[i]);
+                                out += ')';
+                            } else {
+                                out += '[';
+                                for (let i2 = i; i2 < node.variables.length; i2++) {
+                                    recurse(node.variables[i2]);
+                                    if (i2 != node.variables.length - 1) {
+                                        out += ',';
+                                    }
                                 }
+                                out += ']=';
+                                recurse(node.init[i]);
                             }
-                            out += ']=';
-                            recurse(node.init[i]);
                             out += ';'
                             break;
                         }
@@ -348,11 +365,11 @@ function recurse(node, isList) {
                     }
                     for (let i = 0; i < noLocalList.length; i++) {
                         recurse(noLocalList[i]);
-                        if (i < node.init.length) {
+                        // if (i < node.init.length) {
                             out += '=';
                             recurse(node.init[i]);
-                        }
-                        if (i != node.variables.length - 1) {
+                        // }
+                        if (i != noLocalList.length - 1) {
                             out += ',';
                         }
                     }
@@ -459,6 +476,9 @@ function recurse(node, isList) {
                 break;
             case 'StringLiteral':
                 let s = node.raw;
+
+                // Old: Using normal JS strings
+                /*
                 if (s[0] == '\'' || s[0] == '\"') {
                     // Normal string
                     out += s;
@@ -472,6 +492,48 @@ function recurse(node, isList) {
                         i++;
                     }
                     out += '`' + s.substring(i + 1, s.length - i - 1).replaceAll('`', '\\`').replaceAll('$', '\\$') + '`'
+                }
+                */
+
+                // New: Using uint8array
+                if (s[0] == '\'' || s[0] == '\"') {
+                    // Normal string
+                    let content = s.substring(1, s.length - 1);
+                    out += 'new Uint8Array([';
+                    let escape = false;
+                    for (let i = 0; i < content.length; i++) {
+                        if (content[i] == '\\' && escape) {
+                            escape = true;
+                        } else {
+                            if (escape) {
+                                // TODO: digits
+                            } else {
+                                out += content.charCodeAt(i);
+                            }
+                            if (i != content.length - 1) {
+                                out += ',';
+                            }
+                        }
+                    }
+                    out += '])';
+                } else {
+                    // Long string
+                    let i = 1;
+                    while (true) {
+                        if (s[i] == '[') {
+                            break;
+                        }
+                        i++;
+                    }
+                    let content = s.substring(i + 1, s.length - i - 1);
+                    out += 'new Uint8Array([';
+                    for (let i = 0; i < content.length; i++) {
+                        out += content.charCodeAt(i);
+                        if (i != content.length - 1) {
+                            out += ',';
+                        }
+                    }
+                    out += '])';
                 }
 
                 break;
@@ -494,9 +556,9 @@ function recurse(node, isList) {
                 recurse(node.value);
                 break;
             case 'TableKeyString':
-                // out += '[';
+                out += '[\'';
                 recurse(node.key);
-                // out += ']:';
+                out += '\']:';
                 recurse(node.value);
                 break;
             case 'TableValue':
@@ -507,16 +569,37 @@ function recurse(node, isList) {
                 let i2 = 1; // Counter for TableValue
                 for (let i = 0; i < node.fields.length; i++) {
                     let c = node.fields[i];
-                    if (c.type == 'TableValue') {
-                        out += i2 + ':';
-                        i2++;
+                    if (c.value.type == 'VarargLiteral') {
+                        switch (c.type) {
+                            case 'TableKey':
+                                out += '[';
+                                recurse(c.key);
+                                out += ']:';
+                                out += 'RuntimeInternal_VARARG[0]';
+                                break;
+                            case 'TableKeyString':
+                                out += '[\'';
+                                recurse(c.key);
+                                out += '\']:';
+                                out += 'RuntimeInternal_VARARG[0]';
+                                break;
+                            case 'TableValue':
+                                out += '...RuntimeInternal_VARARG'
+                                break;
+                            default:
+                                break;
+                        }
+                    } else {
+                        if (c.type == 'TableValue') {
+                            out += i2 + ':';
+                            i2++;
+                        }
+                        recurse(c);
                     }
-                    recurse(c);
                     if (i != node.fields.length - 1) {
                         out += ',';
                     }
                 }
-
                 out += '}';
                 break;
             case 'LogicalExpression':
@@ -535,9 +618,11 @@ function recurse(node, isList) {
                 out += '(';
                 switch (node.operator) {
                     case '..':
+                        out += 'RuntimeInternal.concatString(';
                         recurse(node.left);
-                        out += '+';
+                        out += ',';
                         recurse(node.right);
+                        out += ')';
                         break;
                     case '==':
                         recurse(node.left);
@@ -629,8 +714,11 @@ function recurse(node, isList) {
                         out += ')'
                         break;
                     case '-':
+                        // Add parenthesis in case of exponentiation
+                        out += '(';
                         out += '-';
                         recurse(node.argument);
+                        out += ')';
                         break;
                     case '~':
                         out += '~';

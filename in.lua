@@ -1,11 +1,3 @@
-function a(...)
-    local b, c = ...
-    print(b, c)
-end
+local a = 'hello'
 
-a(1, 2)
-
--- local t = {1, 2, 3}
--- for k, v in pairs(t) do
---     print(k, v)
--- end
+document.getElementById(a).__a = 2

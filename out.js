@@ -176,8 +176,34 @@ RuntimeInternal.msSinceStart = performance.now();
 }
 
 
-
-
+// print
+{
+    // WARNING: MAY RESULT IN DATA LOSS
+    RuntimeInternal.stringToActualString = function(str) {
+        var out = '';
+        for (let i = 0; i < str.length; i++) {
+            out = out + String.fromCharCode(str[i]);
+        }
+        return out;
+    }
+    RuntimeInternal.toActualString = function(o) {
+        if (o === true) {
+            return 'true';
+        } else if (o === false) {
+            return 'false';
+        } else if (o === null || o === undefined) {
+            return 'nil';
+        } else if (ArrayBuffer.isView(o)) {
+            return RuntimeInternal.stringToActualString(o);
+        } else if (typeof o === 'object') {
+            return 'table: ' + RuntimeInternal.findRef(o);
+        } else if (typeof o === 'function') {
+            return 'function: ' + RuntimeInternal.findRef(o);
+        } else {
+            return String(o);
+        }
+    }
+}
 
 
 
@@ -193,7 +219,8 @@ RuntimeInternal.msSinceStart = performance.now();
 // UnaryOperator '#'
 {
     RuntimeInternal.getLength = function(o) {
-        if (typeof o == 'string') {
+        console.log();
+        if (ArrayBuffer.isView(o)) {
             return o.length;
         } else {
             let i = 1;
@@ -210,16 +237,35 @@ RuntimeInternal.msSinceStart = performance.now();
 
 
 // CallExpression
-// {
-//     RuntimeInternal.wrap = function(o) {
+{
+    RuntimeInternal.wrapAmbiguousCall = function(out) {
+        if (Array.isArray(out)) {
+            return out[0];
+        } else {
+            return out;
+        }
+    }
+}
 
-//     }
-// }
+
+// BinaryExpression '..'
+{
+    RuntimeInternal.concatString = function(str1, str2) {
+        // https://stackoverflow.com/a/49129872
+        var out = new Uint8Array(str1.length + str2.length);
+        out.set(str1);
+        out.set(str2, str1.length);
+        return out;
+    }
+}
 
 
-
-
-
+// StringLiteral
+{
+    Uint8Array.prototype.toString = function() {
+        return RuntimeInternal.toActualString(this);
+    };
+}
 
 
 
@@ -381,7 +427,7 @@ function pcall(f, ...args) {
         out = f(...args);
     }
     catch(err) {
-        if (typeof err == 'string') {
+        if (ArrayBuffer.isView(err)) {
             return false, err;
         } else {
             return false, err.name;
@@ -395,7 +441,7 @@ function pcall(f, ...args) {
 function print(...args) {
     var str = '';
     args.forEach(arg => {
-        str = str + tostring(arg) + '\t'
+        str = str + RuntimeInternal.stringToActualString(arg) + '\t'
     });
     str = str.substring(0, str.length - 1);
     console.log(str);
@@ -504,6 +550,8 @@ function tostring(o) {
         return 'false';
     } else if (o === null || o === undefined) {
         return 'nil';
+    } else if (ArrayBuffer.isView(o)) {
+        return o;
     } else if (typeof o === 'object') {
         return 'table: ' + RuntimeInternal.findRef(o);
     } else if (typeof o === 'function') {
@@ -520,7 +568,7 @@ function type(o) {
         return 'nil';
     } else if (typeof o == 'number') {
         return 'number';
-    } else if (typeof o == 'string') {
+    } else if (ArrayBuffer.isView(o)) {
         return 'string';
     } else if (o === true || o === false) {
         return 'boolean';
@@ -556,7 +604,7 @@ function xpcall(f, errhandler) {
         out = f(...args);
     }
     catch(err) {
-        if (typeof err == 'string') {
+        if (ArrayBuffer.isView(err)) {
             return false, errhandler(err);
         } else {
             return false, errhandler(err.name);
@@ -809,7 +857,7 @@ io.write = function(...args) {
     // https://www.lua.org/pil/21.1.html
     var str = '';
     args.forEach(arg => {
-        str = str + tostring(arg) + '\t'
+        str = str + RuntimeInternal.stringToActualString(arg) + '\t'
     });
     str = str.substring(0, str.length - 1);
     process.stdout.write(str);
@@ -1137,17 +1185,21 @@ string.byte = function(s, i, j) {
         i = 1;
     }
     if (j == undefined) {
-        j = 1;
+        j = i;
     }
+
+    var out = [];
+
+    for (let i2 = i - 1; i2 < j; i2++) {
+        out.push(s[i2]);
+    }
+
+    return out; // TODO: One return ambiguous?
 }
 
 
 string.char = function(...args) {
-    var str = '';
-    args.forEach(arg => {
-        str = str + String.fromCharCode(arg);
-    });
-    return str;
+    return new Uint8Array(args);
 }
 
 
@@ -1176,8 +1228,8 @@ string.gsub = function() {
 }
 
 
-string.len = function() {
-    
+string.len = function(str) {
+    return str.length;
 }
 
 
@@ -1196,13 +1248,31 @@ string.rep = function() {
 }
 
 
-string.reverse = function() {
-    
+string.reverse = function(str) {
+    var out = new Uint8Array(str.length);
+    for (let i = 0; i < str.length; i++) {
+        out[i] = str[str.length - i - 1];
+    }
+    return out;
 }
 
 
-string.sub = function() {
-    
+string.sub = function(str, i, j) {
+    if (j == undefined) {
+        j = -1;
+    }
+    if (i < 0) {
+        i = str.length + 1 + i;
+    }
+    if (j < 0) {
+        j = str.length + 1 + j;
+    }
+
+    var out = new Uint8Array(j - i + 1);
+    for (let i2 = i - 1; i2 < j; i2++) {
+        out[i2 - i + 1] = str[i2];
+    }
+    return out;
 }
 
 
@@ -1314,4 +1384,4 @@ table.sort = function(t, comp) {
 // runtime.js END
 
 
-var a,print;a=function(...RuntimeInternal_VARARG){let[b,c]=RuntimeInternal_VARARG;print(b,c);};a(1,2);
+var document;let a=new Uint8Array([104,101,108,108,111]);document.getElementById(a).__a=2;
