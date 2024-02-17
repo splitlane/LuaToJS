@@ -11,7 +11,9 @@
 
 
 
-var RuntimeInternal = {};
+var RuntimeInternal = {
+    Fengari: {}
+};
 
 
 
@@ -73,7 +75,7 @@ RuntimeInternal.msSinceStart = performance.now();
         }
     }
     RuntimeInternal.isTrue = function(o) {
-        return !RuntimeInternal.isFalse();
+        return !RuntimeInternal.isFalse(o);
     }
 }
 
@@ -219,7 +221,7 @@ RuntimeInternal.msSinceStart = performance.now();
 // UnaryOperator '#'
 {
     RuntimeInternal.getLength = function(o) {
-        console.log();
+        // console.log();
         if (ArrayBuffer.isView(o)) {
             return o.length;
         } else {
@@ -265,9 +267,30 @@ RuntimeInternal.msSinceStart = performance.now();
     Uint8Array.prototype.toString = function() {
         return RuntimeInternal.toActualString(this);
     };
+    Uint8Array.prototype.equals = function(other) {
+        // Inspiration: https://gist.github.com/fflorent/e5e85e955a0ddbf8dc62
+        if (Object.getPrototypeOf(this) !== Object.getPrototypeOf(other)) {
+            return false;
+        }
+        if (this.length === undefined || this.length !== other.length) {
+            return false;
+        }
+
+        for (let i = 0; i < this.length; i++) {
+            if (this[i] !== other[i]) {
+                return false;
+            }
+        }
+
+        return true;
+    }
 }
 
 
+// fs
+{
+    RuntimeInternal.oldRequire = require;
+}
 
 
 
@@ -381,38 +404,55 @@ function module(name, ...args) {
 }
 
 
-function next(t, k) {
-    // Find refs for each key in t
-    var refMap = {};
-    var refList = [];
-    var kref;
-    for (let [k2, v] of Object.entries(t)) {
-        var ref = RuntimeInternal.findRef(k2);
-        refMap[ref] = k2;
-        refList.push(ref);
-        if (k == k2) {
-            kref = ref;
-        }
-    }
-    refList.sort();
+// REF, buggy
+// function next(t, k) {
+//     // Find refs for each key in t
+//     var refMap = {};
+//     var refList = [];
+//     var kref;
+//     for (let [k2, v] of Object.entries(t)) {
+//         var ref = RuntimeInternal.findRef(k2);
+//         refMap[ref] = k2;
+//         refList.push(ref);
+//         if (k == k2) {
+//             kref = ref;
+//         }
+//     }
+//     refList.sort();
 
-    if (k == undefined) {
-        if (RuntimeInternal.getLength(t) == 0) {
-            return;
-        } else {
-            var k2 = refMap[refList[0]];
-            return [k2, t[k2]];
-        }
-    } else {
-        if (kref) {
-            var index = refList.indexOf(kref);
-            var k2 = refMap[refList[index + 1]];
-            return [k2, t[k2]];
-        } else {
-            error('invalid key to \'next\'');
-            return;
+//     if (k == undefined) {
+//         if (RuntimeInternal.getLength(t) == 0) {
+//             return;
+//         } else {
+//             var k2 = refMap[refList[0]];
+//             return [k2, t[k2]];
+//         }
+//     } else {
+//         if (kref) {
+//             var index = refList.indexOf(kref);
+//             var k2 = refMap[refList[index + 1]];
+//             return [k2, t[k2]];
+//         } else {
+//             error('invalid key to \'next\'');
+//             return;
+//         }
+//     }
+// }
+
+
+function next(t, kc) {
+    let keys = Object.keys(t).sort();
+    if (kc == null) {
+        let k = keys[0];
+        return [k, t[k]];
+    }
+    for (let i = 0; i < keys.length - 1; i++) {
+        if (keys[i] == kc) {
+            let k = keys[i + 1];
+            return [k, t[k]];
         }
     }
+    return [];
 }
 
 
@@ -441,7 +481,7 @@ function pcall(f, ...args) {
 function print(...args) {
     var str = '';
     args.forEach(arg => {
-        str = str + RuntimeInternal.stringToActualString(arg) + '\t'
+        str = str + RuntimeInternal.toActualString(arg) + '\t'
     });
     str = str.substring(0, str.length - 1);
     console.log(str);
@@ -466,7 +506,7 @@ function rawset(t, k, v) {
 
 
 // NONFUNCTIONAL (*)
-function require(modname) {
+require = function(modname) {
 
 }
 
@@ -605,9 +645,9 @@ function xpcall(f, errhandler) {
     }
     catch(err) {
         if (ArrayBuffer.isView(err)) {
-            return false, errhandler(err);
+            return [false, errhandler(err)];
         } else {
-            return false, errhandler(err.name);
+            return [false, errhandler(err.name)];
         }
     }
 
@@ -771,6 +811,120 @@ debug.traceback = function() {
 // io START
 
 
+{
+    // RuntimeInternal.asyncToSync = function(f) {
+    //     return (...args) => {
+    //         // Assumes last one is callback
+    //         let cb = args[args.length - 1];
+    //         let out = null;
+    //         args[args.length - 1] = (...o) => {
+    //             out = o;
+    //         }
+    //         while (!out) {
+
+    //         }
+    //         return out;
+    //     }
+    // }
+
+    // NODE ONLY
+    RuntimeInternal.fs = RuntimeInternal.oldRequire('fs');
+    // RuntimeInternal.fsOpen = RuntimeInternal.asyncToSync(fs.open);
+    // RuntimeInternal.fsRead = RuntimeInternal.asyncToSync(fs.read);
+    // RuntimeInternal.fsWrite = RuntimeInternal.asyncToSync(fs.write);
+    // RuntimeInternal.fsClose = RuntimeInternal.asyncToSync(fs.close);
+    RuntimeInternal.fsOpen = RuntimeInternal.fs.openSync;
+    RuntimeInternal.fsRead = RuntimeInternal.fs.readSync;
+    RuntimeInternal.fsWrite = RuntimeInternal.fs.writeSync;
+    RuntimeInternal.fsClose = RuntimeInternal.fs.closeSync;
+
+    RuntimeInternal.fileIdentifier = {
+        file: {},
+        closedFile: {},
+    }
+
+    RuntimeInternal.toFile = function(f) {
+        return {
+            RuntimeInternal_fileIdentifier: RuntimeInternal.fileIdentifier.file,
+            RuntimeInternal_filePosition: 0,
+            RuntimeInternal_file: f,
+            close: (file) => {
+                file.RuntimeInternal_fileIdentifier = RuntimeInternal.fileIdentifier.closedFile;
+                RuntimeInternal.fsClose(f);
+            },
+            flush: (file) => {
+                // TODO: IMPLEMENT
+            },
+            lines: (file) => {
+                // TODO: IMPLEMENT
+                return [];
+            },
+            read: (file, ...args) => {
+                let out = [];
+    
+                if (args.length == 0) {
+                    args.push('*l');
+                }
+    
+                for (let i = 0; i < args.length; i++) {
+                    let arg = RuntimeInternal.toActualString(args[i]);
+                    switch (arg.slice(0, 2)) {
+                        case '*n':
+                            break;
+                        case '*a':
+                            // RuntimeInternal.fsRead();
+                            break;
+                        case '*l':
+                            break;
+                        default:
+                            if (typeof args[i] == 'number') {
+                                let str = new Uint8Array(args[i]);
+                                RuntimeInternal.fsRead(f)                                
+                            }
+                            break;
+                    }
+                }
+    
+                if (out.length == 0 || out.length == 1) {
+                    return out[0];
+                } else {
+                    return out;
+                }
+            },
+            seek: (file, whence, offset) => {
+                let base;
+                switch (whence) {
+                    case 'set':
+                        base = 0;
+                        break;
+                    case 'cur':
+                        // base = file.
+                        break;
+                    case 'end':
+                        // base = fs.statsy
+                        break;
+                    default:
+                        break;
+                }
+            },
+            setvbuf: (file) => {
+                // TODO: IMPLEMENT
+                return [];
+            },
+            write: (file, ...args) => {
+                // TODO: Modes, double check if implemented
+                // TODO: ERROR HANDLING
+                let data = '';
+                for (let i = 0; i < args.length; i++) {
+                    data = data + RuntimeInternal.stringToActualString(args[i]);
+                }
+
+                // TODO: actual writing of data
+            },
+        };
+    }
+}
+
 var io = {};
 
 
@@ -786,9 +940,16 @@ io.flush = function() {
 }
 
 
-// NONFUNCTIONAL (*)
-io.input = function() {
-
+io.input = function(file) {
+    if (file == undefined) {
+        // Do nothing
+    } else if (ArrayBuffer.isView(file)) {
+        var f = io.open(file, 'r');
+        io.stdin = f;
+    } else {
+        io.stdin = f;
+    }
+    return io.stdin;
 }
 
 
@@ -798,15 +959,27 @@ io.lines = function() {
 }
 
 
-// NONFUNCTIONAL (*)
-io.open = function() {
+io.open = function(filenameraw, moderaw) {
+    // TODO: TRANSLATION OF mode TO flag
+    let flag = RuntimeInternal.stringToActualString(moderaw);
+    let filename = RuntimeInternal.stringToActualString(filenameraw);
 
+    let [err, f] = RuntimeInternal.fsOpen(filename, flag);
+
+    return RuntimeInternal.toFile(f);
 }
 
 
-// NONFUNCTIONAL (*)
-io.output = function() {
-
+io.output = function(file) {
+    if (file == undefined) {
+        // Do nothing
+    } else if (ArrayBuffer.isView(file)) {
+        var f = io.open(file, 'w');
+        io.stdout = f;
+    } else {
+        io.stdout = f;
+    }
+    return io.stdout;
 }
 
 
@@ -816,28 +989,19 @@ io.popen = function() {
 }
 
 
-// NONFUNCTIONAL (*)
-io.read = function() {
-
+io.read = function(...args) {
+    let f = io.input();
+    return f.read(f);
 }
 
 
-// NONFUNCTIONAL (*)
-io.stderr = function() {
-
-}
+io.stderr = RuntimeInternal.toFile(process.stderr.fd);
 
 
-// NONFUNCTIONAL (*)
-io.stdin = function() {
-
-}
+io.stdin = RuntimeInternal.toFile(process.stdin.fd);
 
 
-// NONFUNCTIONAL (*)
-io.stdout = function() {
-
-}
+io.stdout = RuntimeInternal.toFile(process.stdout.fd);
 
 
 // NONFUNCTIONAL (*)
@@ -846,22 +1010,32 @@ io.tmpfile = function() {
 }
 
 
-// NONFUNCTIONAL (*)
-io.type = function() {
-
+io.type = function(obj) {
+    if (obj.RuntimeInternal_fileIdentifier === RuntimeInternal.fileIdentifier.file) {
+        return 'file';
+    } else if (obj.RuntimeInternal_fileIdentifier === RuntimeInternal.fileIdentifier.closedFile) {
+        return 'closed file';
+    } else {
+        return null;
+    }
 }
 
 
-// NONFUNCTIONAL (*)
+io.write = function(...args) {
+    let f = io.output();
+    return f.write(f);
+}
+
+
+// TEMP REPLACEMENT
 io.write = function(...args) {
     // https://www.lua.org/pil/21.1.html
     var str = '';
     args.forEach(arg => {
-        str = str + RuntimeInternal.stringToActualString(arg) + '\t'
+        str = str + RuntimeInternal.toActualString(arg);
     });
-    str = str.substring(0, str.length - 1);
     process.stdout.write(str);
-    return;
+    return [];
 }
 
 
@@ -1177,6 +1351,115 @@ os.tmpname = function() {
 // string START
 
 
+{
+    // RuntimeInternal.Fengari.posrelat = function(pos, len) {
+    //     if (pos >= 0) return pos;
+    //     else if (0 - pos > len) return 0;
+    //     else return len + pos + 1;
+    // }
+    // RuntimeInternal.Fengari.find_subarray = function(arr, subarr, from_index) {
+    //     var i = from_index >>> 0,
+    //         sl = subarr.length;
+    
+    //     if (sl === 0)
+    //         return i;
+    
+    //     for (; (i = arr.indexOf(subarr[0], i)) !== -1; i++) {
+    //         if (arr.subarray(i, i+sl) == subarr)
+    //             return i;
+    //     }
+    
+    //     return -1;
+    // }
+    // RuntimeInternal.Fengari.MatchState = function() {
+    //     return {
+    //         src: null,  /* unmodified source string */
+    //         src_init: null,  /* init of source string */
+    //         src_end: null,  /* end ('\0') of source string */
+    //         p: null,  /* unmodified pattern string */
+    //         p_end: null,  /* end ('\0') of pattern */
+    //         matchdepth: NaN,  /* control for recursive depth */
+    //         level: NaN,  /* total number of captures (finished or unfinished) */
+    //         capture: [],
+    //     }
+    // }
+    // RuntimeInternal.Fengari.prepstate = function(ms, L, s, ls, p, lp) {
+    //     ms.L = L;
+    //     ms.matchdepth = MAXCCALLS;
+    //     ms.src = s;
+    //     ms.src_init = 0;
+    //     ms.src_end = ls;
+    //     ms.p = p;
+    //     ms.p_end = lp;
+    // }
+    // RuntimeInternal.Fengari.reprepstate = function(ms) {
+    //     ms.level = 0;
+    //     lualib.lua_assert(ms.matchdepth === MAXCCALLS);
+    // }
+    // RuntimeInternal.Fengari.push_captures = function(ms, s, e) {
+    //     let nlevels = (ms.level === 0 && s != null) ? 1 : ms.level;
+    //     let out = [];
+    //     for (let i = 0; i < nlevels; i++)
+    //         out.push(push_onecapture(ms, i, s, e));
+    //     return out;  /* number of strings pushed */
+    // }
+    // RuntimeInternal.Fengari.push_onecapture = function(ms, i, s, e) {
+    //     if (i >= ms.level) {
+    //         // if (i === 0)
+    //         // TODO: DOING RN
+    //             lua_pushlstring(ms.L, ms.src.subarray(s, e), e - s);  /* add whole match */
+    //         // else
+    //         //     luaL_error(ms.L, to_luastring("invalid capture index %%%d"), i + 1);
+    //     } else {
+    //         let l = ms.capture[i].len;
+    //         if (l === CAP_UNFINISHED) luaL_error(ms.L, to_luastring("unfinished capture"));
+    //         if (l === CAP_POSITION)
+    //             lua_pushinteger(ms.L, ms.capture[i].init - ms.src_init + 1);
+    //         else
+    //             lua_pushlstring(ms.L, ms.src.subarray(ms.capture[i].init), l);
+    //     }
+    // }
+    // RuntimeInternal.Fengari.str_find_aux = function(s, p, init, plain, find) {
+    //     let ls = s.length;
+    //     let lp = p.length;
+    //     let init = RuntimeInternal.Fengari.posrelat(init, ls);
+    //     if (init < 1) init = 1;
+    //     else if (init > ls + 1) {  /* start after string's end? */
+    //         return [];
+    //     }
+    //     /* explicit request or no special characters? */
+    //     if (find && (plain || nospecials(p, lp))) {
+    //         /* do a plain search */
+    //         let f = RuntimeInternal.Fengari.find_subarray(s.subarray(init - 1), p, 0);
+    //         if (f > -1) {
+    //             return [init + f, init + f + lp - 1];
+    //         }
+    //     } else {
+    //         let ms = RuntimeInternal.Fengari.MatchState();
+    //         let s1 = init - 1;
+    //         let anchor = p[0] === 94 /* '^'.charCodeAt(0) */;
+    //         if (anchor) {
+    //             p = p.subarray(1); lp--;  /* skip anchor character */
+    //         }
+    //         RuntimeInternal.Fengari.prepstate(ms, L, s, ls, p, lp);
+    //         do {
+    //             let res;
+    //             RuntimeInternal.Fengari.reprepstate(ms);
+    //             if ((res = match(ms, s1, 0)) !== null) {
+    //                 if (find) {
+    //                     return [s1 + 1,  /* start */
+    //                         res,   /* end */
+    //                         ...RuntimeInternal.Fengari.push_captures(ms, null, 0) + 2
+    //                     ];
+    //                 } else
+    //                     return [...RuntimeInternal.Fengari.push_captures(ms, s1, res)];
+    //             }
+    //         } while (s1++ < ms.src_end && !anchor);
+    //     }
+    //     return [];
+    // }
+}
+
 var string = {};
 
 
@@ -1278,6 +1561,13 @@ string.sub = function(str, i, j) {
 
 string.upper = function() {
     
+}
+
+{
+    // Prototype
+    for (const [key, value] of Object.entries(string)) {
+        Uint8Array.prototype[key] = value;
+    }
 }
 
 
