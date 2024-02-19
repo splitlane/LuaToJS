@@ -1,7 +1,37 @@
+--[[
+local a, a = 1, 2
+print(a)
+
+local b = ...
+print(b)
+
+--test
+local e, f, g, h, i = 1, 2, 3, 4, ...
+
+local function c()
+	return 1, 2
+end
+
+local d = c()
+
+print(a,b,c,d,e,f,g,h,i)
+--]]
 
 
-local a = console.log
-a('sus');
+-- local j = ... or 4
+-- print(j)
+
+function k(...)
+return {
+	1, ...
+}end
+print(unpack(k(2, 3, 4)))
+
+
+
+
+-- local a = console.log
+-- a('sus');
 
 
 

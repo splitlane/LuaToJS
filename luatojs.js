@@ -13,6 +13,14 @@ Metatables: Proxy, Reflect or (compile?)
 GetFirstValue
 
 JS Interop (calling js functions and using js types from lua)
+
+Figure out using unpack like f(unpack(t))
+- use f.apply? spread syntax?
+
+Frontend:
+    Mappings for each character
+    AST Displayer
+    Input box, live output
 */
 
 
@@ -134,7 +142,11 @@ function recurse(node, isList) {
         // Whitespace (using locations and range)
 
 
-        lastNode = node;
+
+
+        let lastLastNode = lastNode; // last node from current node
+
+        lastNode = node; // setting last node to current node
 
         switch (node.type) {
             case 'LabelStatement':
@@ -213,7 +225,7 @@ function recurse(node, isList) {
                 // out += 'let ';
                 for (let i = 0; i < node.variables.length; i++) {
                     // TODO: ADD MORE CALL STATEMENT TYPES
-                    if (i < node.init.length && (node.init[i].type == 'CallExpression') && (i + 1 == node.init.length && node.variables.length > i + 1)) {
+                    if (i < node.init.length && (node.init[i].type == 'CallExpression') && (i + 1 == node.init.length && node.variables.length >= i + 1)) {
                         // function call
                         let noLocalsUsed = true;
                         for (let i2 = i; i2 < node.variables.length; i2++) {
@@ -228,6 +240,9 @@ function recurse(node, isList) {
                             if (empty) {
                                 out += 'let';
                                 empty = false;
+                                if (ambiguous) {
+                                    out += ' ';
+                                }
                             }
                             if (ambiguous) {
                                 recurse(node.variables[i]);
@@ -253,10 +268,11 @@ function recurse(node, isList) {
                                     empty = false;
                                 }
                                 for (let i = 0; i < noLocalList.length; i++) {
-                                    recurse(noLocalList[i]);
+                                    let i2 = noLocalList[i];
+                                    recurse(node.variables[i2]);
                                     if (i < node.init.length) {
                                         out += '=';
-                                        recurse(node.init[i]);
+                                        recurse(node.init[i2]);
                                     }
                                     out += ',';
                                 }
@@ -282,7 +298,7 @@ function recurse(node, isList) {
                             out += ';'
                             break;
                         }
-                    } else if (i < node.init.length && (node.init[i].type == 'VarargLiteral') && (i + 1 == node.init.length && node.variables.length > i + 1)) {
+                    } else if (i < node.init.length && (node.init[i].type == 'VarargLiteral') && (i + 1 == node.init.length && node.variables.length >= i + 1)) {
                         // vararg
                         // RuntimeInternal_VARARG
                         let noLocalsUsed = true;
@@ -297,6 +313,8 @@ function recurse(node, isList) {
                             if (empty) {
                                 out += 'let';
                                 empty = false;
+                            } else {
+                                out += ',';
                             }
                             out += '[';
                             for (let i2 = i; i2 < node.variables.length; i2++) {
@@ -305,7 +323,8 @@ function recurse(node, isList) {
                                     out += ',';
                                 }
                             }
-                            out += ']=RuntimeInternal_VARARG';
+                            out += ']=';
+                            recurse(node.init[i]);
                             break;
                         } else {
                             if (noLocalList.length > 0) {
@@ -331,13 +350,16 @@ function recurse(node, isList) {
                                     out += ',';
                                 }
                             }
-                            out += ']=RuntimeInternal_VARARG;';
+                            out += ']=';
+                            recurse(node.init[i]);
+                            out += ';'
                             break;
                         }
                     } else {
                         // normal
                         if (localsUsed[node.variables[i].name] && i < node.init.length) {
-                            noLocalList.push(node.variables[i]);
+                            // noLocalList.push(node.variables[i]);
+                            noLocalList.push(i);
                         } else {
                             if (empty) {
                                 out += 'let ';
@@ -365,10 +387,12 @@ function recurse(node, isList) {
                         out += ';';
                     }
                     for (let i = 0; i < noLocalList.length; i++) {
-                        recurse(noLocalList[i]);
+                        let i2 = noLocalList[i];
+                        recurse(node.variables[i2]);
                         // if (i < node.init.length) {
                             out += '=';
-                            recurse(node.init[i]);
+                            // recurse(node.init[i]);
+                            recurse(node.init[i2]);
                         // }
                         if (i != noLocalList.length - 1) {
                             out += ',';
@@ -383,6 +407,7 @@ function recurse(node, isList) {
 
                 break;
             case 'AssignmentStatement':
+                // TODO: copy over localstatement
                 for (let i = 0; i < node.variables.length; i++) {
                     recurse(node.variables[i]);
                     if (i < node.init.length) {
@@ -548,7 +573,15 @@ function recurse(node, isList) {
                 out += 'null';
                 break;
             case 'VarargLiteral':
-                out += '...RuntimeInternal_VARARG';
+                if (lastLastNode.type == 'LogicalExpression' || lastLastNode.type == 'BinaryExpression' || lastLastNode.type == 'UnaryExpression' || lastLastNode.type == 'TableKey' || lastLastNode.type == 'TableKeyString') {
+                    out += 'RuntimeInternal_VARARG[0]';
+                } else if (lastLastNode.type == 'LocalStatement' || lastLastNode.type == 'AssignmentStatement') {
+                    out += 'RuntimeInternal_VARARG';
+                } else if (lastLastNode.type == 'TableValue') {
+                    out += 'RuntimeInternal_VARARG';
+                } else {
+                    out += '...RuntimeInternal_VARARG';
+                }
                 break;
             case 'TableKey':
                 out += '[';
@@ -566,42 +599,69 @@ function recurse(node, isList) {
                 recurse(node.value);
                 break;
             case 'TableConstructorExpression':
+                let out2 = out;
+                out = '';
+
                 out += '{';
                 let i2 = 1; // Counter for TableValue
+                let trailingVararg = false;
                 for (let i = 0; i < node.fields.length; i++) {
                     let c = node.fields[i];
-                    if (c.value.type == 'VarargLiteral') {
-                        switch (c.type) {
-                            case 'TableKey':
-                                out += '[';
-                                recurse(c.key);
-                                out += ']:';
-                                out += 'RuntimeInternal_VARARG[0]';
-                                break;
-                            case 'TableKeyString':
-                                out += '[\'';
-                                recurse(c.key);
-                                out += '\']:';
-                                out += 'RuntimeInternal_VARARG[0]';
-                                break;
-                            case 'TableValue':
-                                out += '...RuntimeInternal_VARARG'
-                                break;
-                            default:
-                                break;
-                        }
-                    } else {
+                    // if (c.value.type == 'VarargLiteral') {
+                    //     switch (c.type) {
+                    //         case 'TableKey':
+                    //             out += '[';
+                    //             recurse(c.key);
+                    //             out += ']:';
+                    //             out += 'RuntimeInternal_VARARG[0]';
+                    //             break;
+                    //         case 'TableKeyString':
+                    //             out += '[\'';
+                    //             recurse(c.key);
+                    //             out += '\']:';
+                    //             out += 'RuntimeInternal_VARARG[0]';
+                    //             break;
+                    //         case 'TableValue':
+                    //             out += '...RuntimeInternal_VARARG'
+                    //             break;
+                    //         default:
+                    //             break;
+                    //     }
+                    // } else {
                         if (c.type == 'TableValue') {
-                            out += i2 + ':';
-                            i2++;
+                            if (c.value.type == 'VarargLiteral' && i == node.fields.length - 1) {
+                                // out += i2 + ':';
+                                // out += ''
+                                trailingVararg = c;
+                                i2++;
+                            } else {
+                                out += i2 + ':';
+                                recurse(c);
+                                if (c.value.type == 'VarargLiteral') {
+                                    out += '[0]';
+                                }
+                                i2++;
+                            }
+                        } else {
+                            recurse(c);
                         }
-                        recurse(c);
-                    }
-                    if (i != node.fields.length - 1) {
+                        
+                    // }
+                    if (i != node.fields.length - 1 & !(i == node.fields.length - 2 && node.fields[i + 1].value.type == 'VarargLiteral')) {
                         out += ',';
                     }
                 }
                 out += '}';
+
+                if (trailingVararg) {
+                    out = out2 + 'RuntimeInternal.addVararg(' + out + ',';
+                    recurse(trailingVararg);
+                    out += ',' + (i2 - 1) + ')';
+                } else {
+                    out = out2 + out;
+                }
+                
+
                 break;
             case 'LogicalExpression':
                 recurse(node.left);
@@ -775,12 +835,13 @@ function recurse(node, isList) {
             case 'StringCallExpression':
                 recurse(node.base);
                 out += '(';
-                for (let i = 0; i < node.arguments.length; i++) {
-                    recurse(node.arguments[i]);
-                    if (i != node.arguments.length - 1) {
-                        out += ',';
-                    }
-                }
+                recurse(node.argument);
+                // for (let i = 0; i < node.arguments.length; i++) {
+                //     recurse(node.arguments[i]);
+                //     if (i != node.arguments.length - 1) {
+                //         out += ',';
+                //     }
+                // }
                 out += ')';
                 break;
             case 'Comment':
@@ -788,6 +849,7 @@ function recurse(node, isList) {
                 break;
 
             default:
+                console.error('ERROR: INVALID NODE');
                 break;
                 
         }

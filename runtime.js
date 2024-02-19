@@ -306,6 +306,26 @@ RuntimeInternal.msSinceStart = performance.now();
 }
 
 
+// RuntimeInternal_VARARG
+{
+    RuntimeInternal_VARARG = [];
+    let t = process.argv;
+    for (let i = 2; i < t.length; i++) {
+        RuntimeInternal_VARARG.push(t[i]);
+    }
+}
+
+
+// TableConstructorExpression - VarargLiteral
+{
+    RuntimeInternal.addVararg = function(object, args, starti) {
+        for (let i2 = 0; i2 < args.length; i2++) {
+            object[starti + i2] = args[i2];
+        }
+        return object;
+    }
+    // console.log(RuntimeInternal.addVararg({1: 1, 2: 2}, ['a', 'b'], 3))
+}
 
 
 
@@ -642,12 +662,17 @@ function unpack(list, i, j) {
     if (j == undefined) {
         j = RuntimeInternal.getLength(list);
     }
-    // var out = [];
-    // for (let i2 = i; i2 < j + 1; i2++) {
-    //     out.push(list[i2]);
-    // }
-    // return out;
+
+    var out = [];
+    for (let i2 = i; i2 < j + 1; i2++) {
+        out.push(list[i2]);
+    }
+    return out;
+
+    // for arrays, not objects
+    /*
     return list.slice(i, j + 1);
+    */
 }
 
 
