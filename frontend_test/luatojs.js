@@ -15,9 +15,7 @@ GetFirstValue
 JS Interop (calling js functions and using js types from lua)
 
 Figure out using unpack like f(unpack(t))
-- Use f.apply? spread syntax?
-try catch, pcall
-- Maybe mark some special functions?
+- use f.apply? spread syntax?
 
 Frontend:
     Mappings for each character
@@ -25,30 +23,32 @@ Frontend:
     Input box, live output
 */
 
-
-var parser = require('luaparse');
-
+var parser = luaparse;
 
 
-// https://www.geeksforgeeks.org/node-js-fs-readfilesync-method/
-const fs = require('fs');
-var infile = './in.lua';
-// infile = './tests/donut/in_f.lua';
-var outfile = './out.js';
-
-// frontend test compile
-infile = './frontend_test/script.lua';
-outfile = './frontend_test/script.js';
-
-
-var runtimefile = './runtime.js'
-// var runtimefile = './runtime_min.js'
-var CODE = fs.readFileSync(infile, {encoding: 'utf8', flag: 'r'});
+// var parser = require('luaparse');
 
 
 
+// // https://www.geeksforgeeks.org/node-js-fs-readfilesync-method/
+// const fs = require('fs');
+// var infile = './in.lua';
+// // infile = './tests/donut/in_f.lua';
+// var outfile = './out.js';
+
+// // frontend test compile
+// infile = './frontend_test/script.lua';
+// outfile = './frontend_test/script.js';
 
 
+// var runtimefile = './runtime.js'
+// // var runtimefile = './runtime_min.js'
+// var CODE = fs.readFileSync(infile, {encoding: 'utf8', flag: 'r'});
+
+
+
+
+window.luatojs = function(CODE) {
 
 var options = {
     scope: true,
@@ -874,11 +874,12 @@ for (let i = 0; i < comments.length; i++) {
 // */
 
 
-
+return out;
 
 
 // console.log(out);
 
-var runtime = fs.readFileSync(runtimefile, {encoding: 'utf8', flag: 'r'});
-out = runtime + out;
-fs.writeFileSync(outfile, out, {encoding: 'utf8', flag: 'w'});
+// var runtime = fs.readFileSync(runtimefile, {encoding: 'utf8', flag: 'r'});
+// out = runtime + out;
+
+}
