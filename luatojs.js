@@ -23,7 +23,7 @@ var parser = require('luaparse');
 // https://www.geeksforgeeks.org/node-js-fs-readfilesync-method/
 const fs = require('fs');
 var infile = './in.lua';
-infile = './tests/donut/in_f.lua';
+// infile = './tests/donut/in_f.lua';
 var outfile = './out.js';
 var runtimefile = './runtime.js'
 // var runtimefile = './runtime_min.js'

@@ -6,6 +6,9 @@
     WARNING: Minify for production
 
     Taken from old LuaToJS (Code (Summer 2023)) and worked on
+
+    https://github.com/teoxoy/lua-in-js
+        https://github.com/teoxoy/lua-in-js/tree/master/src/lib
 */
 
 
@@ -1352,112 +1355,77 @@ os.tmpname = function() {
 
 
 {
-    // RuntimeInternal.Fengari.posrelat = function(pos, len) {
-    //     if (pos >= 0) return pos;
-    //     else if (0 - pos > len) return 0;
-    //     else return len + pos + 1;
-    // }
-    // RuntimeInternal.Fengari.find_subarray = function(arr, subarr, from_index) {
-    //     var i = from_index >>> 0,
-    //         sl = subarr.length;
-    
-    //     if (sl === 0)
-    //         return i;
-    
-    //     for (; (i = arr.indexOf(subarr[0], i)) !== -1; i++) {
-    //         if (arr.subarray(i, i+sl) == subarr)
-    //             return i;
-    //     }
-    
-    //     return -1;
-    // }
-    // RuntimeInternal.Fengari.MatchState = function() {
-    //     return {
-    //         src: null,  /* unmodified source string */
-    //         src_init: null,  /* init of source string */
-    //         src_end: null,  /* end ('\0') of source string */
-    //         p: null,  /* unmodified pattern string */
-    //         p_end: null,  /* end ('\0') of pattern */
-    //         matchdepth: NaN,  /* control for recursive depth */
-    //         level: NaN,  /* total number of captures (finished or unfinished) */
-    //         capture: [],
-    //     }
-    // }
-    // RuntimeInternal.Fengari.prepstate = function(ms, L, s, ls, p, lp) {
-    //     ms.L = L;
-    //     ms.matchdepth = MAXCCALLS;
-    //     ms.src = s;
-    //     ms.src_init = 0;
-    //     ms.src_end = ls;
-    //     ms.p = p;
-    //     ms.p_end = lp;
-    // }
-    // RuntimeInternal.Fengari.reprepstate = function(ms) {
-    //     ms.level = 0;
-    //     lualib.lua_assert(ms.matchdepth === MAXCCALLS);
-    // }
-    // RuntimeInternal.Fengari.push_captures = function(ms, s, e) {
-    //     let nlevels = (ms.level === 0 && s != null) ? 1 : ms.level;
-    //     let out = [];
-    //     for (let i = 0; i < nlevels; i++)
-    //         out.push(push_onecapture(ms, i, s, e));
-    //     return out;  /* number of strings pushed */
-    // }
-    // RuntimeInternal.Fengari.push_onecapture = function(ms, i, s, e) {
-    //     if (i >= ms.level) {
-    //         // if (i === 0)
-    //         // TODO: DOING RN
-    //             lua_pushlstring(ms.L, ms.src.subarray(s, e), e - s);  /* add whole match */
-    //         // else
-    //         //     luaL_error(ms.L, to_luastring("invalid capture index %%%d"), i + 1);
-    //     } else {
-    //         let l = ms.capture[i].len;
-    //         if (l === CAP_UNFINISHED) luaL_error(ms.L, to_luastring("unfinished capture"));
-    //         if (l === CAP_POSITION)
-    //             lua_pushinteger(ms.L, ms.capture[i].init - ms.src_init + 1);
-    //         else
-    //             lua_pushlstring(ms.L, ms.src.subarray(ms.capture[i].init), l);
-    //     }
-    // }
-    // RuntimeInternal.Fengari.str_find_aux = function(s, p, init, plain, find) {
-    //     let ls = s.length;
-    //     let lp = p.length;
-    //     let init = RuntimeInternal.Fengari.posrelat(init, ls);
-    //     if (init < 1) init = 1;
-    //     else if (init > ls + 1) {  /* start after string's end? */
-    //         return [];
-    //     }
-    //     /* explicit request or no special characters? */
-    //     if (find && (plain || nospecials(p, lp))) {
-    //         /* do a plain search */
-    //         let f = RuntimeInternal.Fengari.find_subarray(s.subarray(init - 1), p, 0);
-    //         if (f > -1) {
-    //             return [init + f, init + f + lp - 1];
-    //         }
-    //     } else {
-    //         let ms = RuntimeInternal.Fengari.MatchState();
-    //         let s1 = init - 1;
-    //         let anchor = p[0] === 94 /* '^'.charCodeAt(0) */;
-    //         if (anchor) {
-    //             p = p.subarray(1); lp--;  /* skip anchor character */
-    //         }
-    //         RuntimeInternal.Fengari.prepstate(ms, L, s, ls, p, lp);
-    //         do {
-    //             let res;
-    //             RuntimeInternal.Fengari.reprepstate(ms);
-    //             if ((res = match(ms, s1, 0)) !== null) {
-    //                 if (find) {
-    //                     return [s1 + 1,  /* start */
-    //                         res,   /* end */
-    //                         ...RuntimeInternal.Fengari.push_captures(ms, null, 0) + 2
-    //                     ];
-    //                 } else
-    //                     return [...RuntimeInternal.Fengari.push_captures(ms, s1, res)];
-    //             }
-    //         } while (s1++ < ms.src_end && !anchor);
-    //     }
-    //     return [];
-    // }
+    RuntimeInternal.luainjs = {};
+
+    RuntimeInternal.luainjs.ROSETTA_STONE = {
+        '([^a-zA-Z0-9%(])-': '$1*?',
+        '([^%])-([^a-zA-Z0-9?])': '$1*?$2',
+        '([^%])\\.': '$1[\\s\\S]',
+        '(.)-$': '$1*?',
+        '%a': '[a-zA-Z]',
+        '%A': '[^a-zA-Z]',
+        '%c': '[\x00-\x1f]',
+        '%C': '[^\x00-\x1f]',
+        '%d': '\\d',
+        '%D': '[^d]',
+        '%l': '[a-z]',
+        '%L': '[^a-z]',
+        '%p': '[.,"\'?!;:#$%&()*+-/<>=@\\[\\]\\\\^_{}|~]',
+        '%P': '[^.,"\'?!;:#$%&()*+-/<>=@\\[\\]\\\\^_{}|~]',
+        '%s': '[ \\t\\n\\f\\v\\r]',
+        '%S': '[^ \t\n\f\v\r]',
+        '%u': '[A-Z]',
+        '%U': '[^A-Z]',
+        '%w': '[a-zA-Z0-9]',
+        '%W': '[^a-zA-Z0-9]',
+        '%x': '[a-fA-F0-9]',
+        '%X': '[^a-fA-F0-9]',
+        '%([^a-zA-Z])': '\\$1'
+    };
+
+    // pattern should be js string
+    RuntimeInternal.luainjs.translatePattern = function(pattern) {
+        // TODO Add support for balanced character matching (not sure this is easily achieveable).
+
+        // Replace single backslash with double backslashes
+        let tPattern = pattern.replace(/\\/g, '\\\\')
+        
+        for (const [k, v] of Object.entries(RuntimeInternal.luainjs.ROSETTA_STONE)) {
+            tPattern = tPattern.replace(new RegExp(k, 'g'), v)
+        }
+
+        let nestingLevel = 0
+
+        for (let i = 0, l = tPattern.length; i < l; i++) {
+            if (i && tPattern.substr(i - 1, 1) === '\\') {
+                continue
+            }
+
+            // Remove nested square brackets caused by substitutions
+            const character = tPattern.substr(i, 1)
+
+            if (character === '[' || character === ']') {
+                if (character === ']') {
+                    nestingLevel -= 1
+                }
+
+                if (nestingLevel > 0) {
+                    tPattern = tPattern.substr(0, i) + tPattern.substr(i + 1)
+                    i -= 1
+                    l -= 1
+                }
+
+                if (character === '[') {
+                    nestingLevel += 1
+                }
+            }
+        }
+
+        return tPattern
+    };
+
+    // console.log(RuntimeInternal.luainjs.ROSETTA_STONE)
+    // console.log(RuntimeInternal.luainjs.translatePattern('%s'))
 }
 
 var string = {};
@@ -1674,4 +1642,4 @@ table.sort = function(t, comp) {
 // runtime.js END
 
 
-var A,B,z,b,E,S,math,C,F,I,io,T,string,W,P,print,H,e,g,m,n,d,f,c,h,D,l,t,x,y,o,N;A=0;B=0;z={};b={};E={1:32,2:46,3:44,4:45,5:126,6:58,7:59,8:61,9:33,10:42,11:35,12:36,13:64};S=math.sin;C=math.cos;F=math.floor;I=io.write;T=string.char;W=60;P=print;H=25;P(new Uint8Array([92,92,120,49,98,91,50,74]));for(let w=1;w<=240;w++){for(let o=0;o<=(W*H);o++){b[o]=1;z[o]=0;}e=S(A);g=C(A);m=C(B);n=S(B);for(let j=0;j<=6.28;j+=0.09){d=C(j);f=S(j);for(let i=0;i<=6.28;i+=0.04){c=S(i);h=(d+2);D=(1/((((c*h)*e)+(f*g))+5));l=C(i);t=(((c*h)*g)-(f*e));x=F(((W/2)+(((W*0.3)*D)*(((l*h)*m)-(t*n)))));y=F(((H/2)+(((H*0.6)*D)*(((l*h)*n)+(t*m)))));o=(x+(W*y));N=(math.max(0,F((8*((((((f*e)-((c*d)*g))*m)-((c*d)*e))-(f*g))-((l*d)*n)))))+2);if(RuntimeInternal.isTrue((H>y)&&(y>0)&&(x>0)&&(W>x)&&(D>z[o]))){z[o]=D;b[o]=N;}}}P(new Uint8Array([92,92,120,49,98,91,72]));for(let k=0;k<=(W*H);k++){if(RuntimeInternal.isTrue(((k%W)!==0))){I(T(E[b[k]]));}else{I(T(10));}}A=(A+0.04);B=(B+0.02);}
+let a=console.log;a(new Uint8Array([115,117,115]));

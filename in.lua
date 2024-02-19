@@ -1,9 +1,12 @@
 
 
+local a = console.log
+a('sus');
 
 
-local f = io.open('test.txt', 'r')
-print(f:read('*all'))
+
+-- local f = io.open('test.txt', 'r')
+-- print(f:read('*all'))
 
 
 
