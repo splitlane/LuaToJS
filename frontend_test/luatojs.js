@@ -223,7 +223,7 @@ function recurse(node, isList) {
             case 'RepeatStatement':
                 out += 'do{';
                 recurse(node.body, true);
-                out += '}while(RuntimeInternal.isTrue('; 
+                out += '}while(RuntimeInternal.isFalse('; 
                 recurse(node.condition);
                 out += '));';
                 break;
